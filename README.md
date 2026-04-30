@@ -30,6 +30,8 @@ For automatic weather, enter a location such as `Copenhagen` or `Aarhus, Denmark
 
 If automatic weather is unavailable, the manual weather fallback text can still be displayed.
 
+For Lyngby near Copenhagen, entering `Lyngby` is treated as `Kongens Lyngby` to avoid matching other Danish places named Lyngby.
+
 You can also set default text in `index.html`:
 
 ```javascript
