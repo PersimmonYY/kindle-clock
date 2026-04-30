@@ -13,6 +13,15 @@ var MANUAL_UTC_OFFSET_HOURS = 2;
 
 Use `MANUAL_UTC_OFFSET_HOURS = 2` for Denmark summer time, UTC+2.
 
+The page also shows two smaller world clocks. Edit these values in `index.html` to change them:
+
+```javascript
+var WORLD_CLOCK_ONE_LABEL = "Beijing";
+var WORLD_CLOCK_ONE_UTC_OFFSET_HOURS = 8;
+var WORLD_CLOCK_TWO_LABEL = "Central America";
+var WORLD_CLOCK_TWO_UTC_OFFSET_HOURS = -6;
+```
+
 The page also shows a Chinese lunar date.
 
 Use the `Settings` link on the page to save a note and weather settings in the Kindle browser. The saved text is stored locally in the browser.
