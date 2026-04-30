@@ -49,6 +49,33 @@
       font-weight: bold;
     }
 
+    table.worldClocks {
+      margin: 22px auto 0 auto;
+      width: 92%;
+      border-collapse: collapse;
+    }
+
+    table.worldClocks td {
+      width: 50%;
+      text-align: center;
+      vertical-align: top;
+      padding: 0 8px;
+    }
+
+    .worldLabel {
+      font-size: 20px;
+      line-height: 1.2;
+      font-weight: bold;
+    }
+
+    .worldTime {
+      margin-top: 4px;
+      font-size: 34px;
+      line-height: 1.1;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
     #message,
     #weather {
       margin: 24px auto 0 auto;
@@ -127,6 +154,18 @@
         <div id="clock">--:--</div>
         <div id="date">Loading date</div>
         <div id="lunar">Loading lunar date</div>
+        <table class="worldClocks" summary="">
+          <tr>
+            <td>
+              <div class="worldLabel" id="worldOneLabel">Beijing</div>
+              <div class="worldTime" id="worldOneTime">--:--</div>
+            </td>
+            <td>
+              <div class="worldLabel" id="worldTwoLabel">Central America</div>
+              <div class="worldTime" id="worldTwoTime">--:--</div>
+            </td>
+          </tr>
+        </table>
         <div id="message"></div>
         <div id="weather"></div>
         <div id="settingsLink"><a href="#" onclick="showSettings(); return false;">Settings</a></div>
@@ -149,6 +188,10 @@
   <script type="text/javascript">
     var USE_MANUAL_OFFSET = true;
     var MANUAL_UTC_OFFSET_HOURS = 2;
+    var WORLD_CLOCK_ONE_LABEL = "Beijing";
+    var WORLD_CLOCK_ONE_UTC_OFFSET_HOURS = 8;
+    var WORLD_CLOCK_TWO_LABEL = "Central America";
+    var WORLD_CLOCK_TWO_UTC_OFFSET_HOURS = -6;
     var CUSTOM_MESSAGE = "";
     var WEATHER_TEXT = "";
     var WEATHER_LOCATION = "";
@@ -439,6 +482,15 @@
       return now;
     }
 
+    function getOffsetDate(offsetHours) {
+      var now = new Date();
+      return new Date(now.getTime() + (now.getTimezoneOffset() * 60000) + (offsetHours * 3600000));
+    }
+
+    function formatTime(dateObj) {
+      return pad(dateObj.getHours()) + ":" + pad(dateObj.getMinutes());
+    }
+
     function lYearDays(year) {
       var i;
       var sum = 348;
@@ -588,6 +640,10 @@
       document.getElementById("clock").innerHTML = pad(hours) + ":" + pad(minutes);
       document.getElementById("date").innerHTML = dateText;
       document.getElementById("lunar").innerHTML = getLunarDateText(now);
+      document.getElementById("worldOneLabel").innerHTML = WORLD_CLOCK_ONE_LABEL;
+      document.getElementById("worldOneTime").innerHTML = formatTime(getOffsetDate(WORLD_CLOCK_ONE_UTC_OFFSET_HOURS));
+      document.getElementById("worldTwoLabel").innerHTML = WORLD_CLOCK_TWO_LABEL;
+      document.getElementById("worldTwoTime").innerHTML = formatTime(getOffsetDate(WORLD_CLOCK_TWO_UTC_OFFSET_HOURS));
       setOptionalText("message", CUSTOM_MESSAGE);
       if (!WEATHER_LOCATION || trimText(WEATHER_LOCATION).length === 0) {
         setOptionalText("weather", WEATHER_TEXT);
