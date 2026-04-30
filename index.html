@@ -78,10 +78,10 @@
 
     #message,
     #weather {
-      margin: 24px auto 0 auto;
+      margin: 22px auto 0 auto;
       width: 92%;
       font-size: 24px;
-      line-height: 1.25;
+      line-height: 1.2;
       font-weight: bold;
       white-space: pre-line;
     }
@@ -459,7 +459,7 @@
           humidity = Math.round(current.relative_humidity_2m);
           wind = Math.round(current.wind_speed_10m);
           code = current.weather_code;
-          text = shortPlaceName(place) + ": " + temp + "C, " + weatherDescription(code) + "\nRH " + humidity + "%, wind " + wind + " km/h";
+          text = shortPlaceName(place) + "\n" + temp + "\u00b0C, " + weatherDescription(code) + "\nRH " + humidity + "%, wind " + wind + " km/h";
           setWeatherCache(text);
         }, showWeatherError);
       }, showWeatherError);
