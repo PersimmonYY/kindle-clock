@@ -177,6 +177,7 @@
           <label for="weatherInput">Manual weather fallback</label>
           <input id="weatherInput" type="text" value="">
           <button type="button" onclick="saveSettings();">Save</button>
+          <button type="button" onclick="saveSettingsToUrl();">Save URL</button>
           <button type="button" onclick="hideSettings();">Cancel</button>
           <button type="button" onclick="clearSettings();">Clear</button>
         </div>
@@ -212,6 +213,55 @@
 
     function decodeCookieValue(value) {
       return decodeURIComponent(String(value).replace(/\+/g, "%20"));
+    }
+
+    function simpleEncode(value) {
+      var encoded = encodeURIComponent(value);
+      encoded = encoded.replace(/%20/g, "+");
+      return encoded;
+    }
+
+    function simpleDecode(value) {
+      return decodeURIComponent(String(value).replace(/\+/g, "%20"));
+    }
+
+    function getHashValue(name) {
+      var i;
+      var item;
+      var key;
+      var value;
+      var hash = window.location.hash;
+      var parts;
+
+      if (!hash || hash.length < 2) {
+        return null;
+      }
+
+      hash = hash.substring(1);
+      parts = hash.split("&");
+
+      for (i = 0; i < parts.length; i = i + 1) {
+        item = parts[i];
+        key = item;
+        value = "";
+
+        if (item.indexOf("=") >= 0) {
+          key = item.substring(0, item.indexOf("="));
+          value = item.substring(item.indexOf("=") + 1);
+        }
+
+        if (key === name) {
+          return simpleDecode(value);
+        }
+      }
+
+      return null;
+    }
+
+    function updateUrlSettings() {
+      var hash = "note=" + simpleEncode(CUSTOM_MESSAGE) + "&weather=" + simpleEncode(WEATHER_TEXT) + "&place=" + simpleEncode(WEATHER_LOCATION);
+
+      window.location.hash = hash;
     }
 
     function setCookie(name, value) {
@@ -275,6 +325,10 @@
     }
 
     function loadSettings() {
+      var hashMessage;
+      var hashWeather;
+      var hashLocation;
+
       CUSTOM_MESSAGE = loadValue("kindleClockMessage", CUSTOM_MESSAGE);
       WEATHER_TEXT = loadValue("kindleClockWeather", WEATHER_TEXT);
       WEATHER_LOCATION = loadValue("kindleClockWeatherLocation", WEATHER_LOCATION);
@@ -283,6 +337,22 @@
       WEATHER_CACHE_TIME = parseInt(loadValue("kindleClockWeatherCacheTime", "0"), 10);
       if (isNaN(WEATHER_CACHE_TIME)) {
         WEATHER_CACHE_TIME = 0;
+      }
+
+      hashMessage = getHashValue("note");
+      hashWeather = getHashValue("weather");
+      hashLocation = getHashValue("place");
+
+      if (hashMessage !== null) {
+        CUSTOM_MESSAGE = hashMessage;
+      }
+
+      if (hashWeather !== null) {
+        WEATHER_TEXT = hashWeather;
+      }
+
+      if (hashLocation !== null) {
+        WEATHER_LOCATION = hashLocation;
       }
     }
 
@@ -313,6 +383,11 @@
       hideSettings();
       updateClock();
       updateWeather(true);
+    }
+
+    function saveSettingsToUrl() {
+      saveSettings();
+      updateUrlSettings();
     }
 
     function clearSettings() {
