@@ -132,7 +132,9 @@
         <div id="settingsPanel">
           <label for="messageInput">Note</label>
           <textarea id="messageInput" rows="3" cols="30"></textarea>
-          <label for="weatherInput">Weather</label>
+          <label for="weatherLocationInput">Weather location</label>
+          <input id="weatherLocationInput" type="text" value="">
+          <label for="weatherInput">Manual weather fallback</label>
           <input id="weatherInput" type="text" value="">
           <button type="button" onclick="saveSettings();">Save</button>
           <button type="button" onclick="hideSettings();">Cancel</button>
@@ -148,6 +150,11 @@
     var MANUAL_UTC_OFFSET_HOURS = 2;
     var CUSTOM_MESSAGE = "";
     var WEATHER_TEXT = "";
+    var WEATHER_LOCATION = "";
+    var WEATHER_CACHE_TEXT = "";
+    var WEATHER_CACHE_TIME = 0;
+    var WEATHER_LOADING = false;
+    var WEATHER_REFRESH_MS = 1800000;
     var storageWorks = true;
 
     function escapeHtml(text) {
@@ -225,11 +232,18 @@
     function loadSettings() {
       CUSTOM_MESSAGE = loadValue("kindleClockMessage", CUSTOM_MESSAGE);
       WEATHER_TEXT = loadValue("kindleClockWeather", WEATHER_TEXT);
+      WEATHER_LOCATION = loadValue("kindleClockWeatherLocation", WEATHER_LOCATION);
+      WEATHER_CACHE_TEXT = loadValue("kindleClockWeatherCacheText", WEATHER_CACHE_TEXT);
+      WEATHER_CACHE_TIME = parseInt(loadValue("kindleClockWeatherCacheTime", "0"), 10);
+      if (isNaN(WEATHER_CACHE_TIME)) {
+        WEATHER_CACHE_TIME = 0;
+      }
     }
 
     function showSettings() {
       document.getElementById("messageInput").value = CUSTOM_MESSAGE;
       document.getElementById("weatherInput").value = WEATHER_TEXT;
+      document.getElementById("weatherLocationInput").value = WEATHER_LOCATION;
       document.getElementById("settingsPanel").style.display = "block";
     }
 
@@ -240,21 +254,177 @@
     function saveSettings() {
       CUSTOM_MESSAGE = document.getElementById("messageInput").value;
       WEATHER_TEXT = document.getElementById("weatherInput").value;
+      WEATHER_LOCATION = document.getElementById("weatherLocationInput").value;
+      WEATHER_CACHE_TEXT = "";
+      WEATHER_CACHE_TIME = 0;
       saveValue("kindleClockMessage", CUSTOM_MESSAGE);
       saveValue("kindleClockWeather", WEATHER_TEXT);
+      saveValue("kindleClockWeatherLocation", WEATHER_LOCATION);
+      saveValue("kindleClockWeatherCacheText", WEATHER_CACHE_TEXT);
+      saveValue("kindleClockWeatherCacheTime", "" + WEATHER_CACHE_TIME);
       hideSettings();
       updateClock();
+      updateWeather(true);
     }
 
     function clearSettings() {
       CUSTOM_MESSAGE = "";
       WEATHER_TEXT = "";
+      WEATHER_LOCATION = "";
+      WEATHER_CACHE_TEXT = "";
+      WEATHER_CACHE_TIME = 0;
       document.getElementById("messageInput").value = "";
       document.getElementById("weatherInput").value = "";
+      document.getElementById("weatherLocationInput").value = "";
       saveValue("kindleClockMessage", "");
       saveValue("kindleClockWeather", "");
+      saveValue("kindleClockWeatherLocation", "");
+      saveValue("kindleClockWeatherCacheText", "");
+      saveValue("kindleClockWeatherCacheTime", "0");
       hideSettings();
       updateClock();
+    }
+
+    function trimText(text) {
+      return String(text).replace(/^\s+/, "").replace(/\s+$/, "");
+    }
+
+    function requestJson(url, successCallback, errorCallback) {
+      var request = new XMLHttpRequest();
+
+      request.onreadystatechange = function () {
+        if (request.readyState === 4) {
+          if (request.status >= 200 && request.status < 300) {
+            try {
+              successCallback(JSON.parse(request.responseText));
+            } catch (error) {
+              errorCallback();
+            }
+          } else {
+            errorCallback();
+          }
+        }
+      };
+
+      try {
+        request.open("GET", url, true);
+        request.send(null);
+      } catch (error) {
+        errorCallback();
+      }
+    }
+
+    function weatherDescription(code) {
+      if (code === 0) { return "Clear"; }
+      if (code === 1 || code === 2) { return "Partly cloudy"; }
+      if (code === 3) { return "Cloudy"; }
+      if (code === 45 || code === 48) { return "Fog"; }
+      if (code === 51 || code === 53 || code === 55) { return "Drizzle"; }
+      if (code === 56 || code === 57) { return "Freezing drizzle"; }
+      if (code === 61 || code === 63 || code === 65) { return "Rain"; }
+      if (code === 66 || code === 67) { return "Freezing rain"; }
+      if (code === 71 || code === 73 || code === 75) { return "Snow"; }
+      if (code === 77) { return "Snow grains"; }
+      if (code === 80 || code === 81 || code === 82) { return "Rain showers"; }
+      if (code === 85 || code === 86) { return "Snow showers"; }
+      if (code === 95) { return "Thunderstorm"; }
+      if (code === 96 || code === 99) { return "Thunderstorm with hail"; }
+      return "Weather";
+    }
+
+    function formatPlace(place) {
+      var text = place.name || WEATHER_LOCATION;
+
+      if (place.admin1 && place.admin1 !== place.name) {
+        text = text + ", " + place.admin1;
+      }
+
+      if (place.country) {
+        text = text + ", " + place.country;
+      }
+
+      return text;
+    }
+
+    function setWeatherCache(text) {
+      WEATHER_CACHE_TEXT = text;
+      WEATHER_CACHE_TIME = new Date().getTime();
+      saveValue("kindleClockWeatherCacheText", WEATHER_CACHE_TEXT);
+      saveValue("kindleClockWeatherCacheTime", "" + WEATHER_CACHE_TIME);
+      setOptionalText("weather", WEATHER_CACHE_TEXT);
+    }
+
+    function showWeatherError() {
+      WEATHER_LOADING = false;
+
+      if (WEATHER_CACHE_TEXT && WEATHER_CACHE_TEXT.length > 0) {
+        setOptionalText("weather", WEATHER_CACHE_TEXT);
+      } else if (WEATHER_TEXT && WEATHER_TEXT.length > 0) {
+        setOptionalText("weather", WEATHER_TEXT);
+      } else {
+        setOptionalText("weather", "Weather unavailable");
+      }
+    }
+
+    function updateWeather(force) {
+      var location = trimText(WEATHER_LOCATION);
+      var nowTime = new Date().getTime();
+      var geocodeUrl;
+
+      if (!location || location.length === 0) {
+        setOptionalText("weather", WEATHER_TEXT);
+        return;
+      }
+
+      if (!force && WEATHER_CACHE_TEXT && WEATHER_CACHE_TIME > 0 && (nowTime - WEATHER_CACHE_TIME) < WEATHER_REFRESH_MS) {
+        setOptionalText("weather", WEATHER_CACHE_TEXT);
+        return;
+      }
+
+      if (WEATHER_LOADING) {
+        return;
+      }
+
+      WEATHER_LOADING = true;
+      setOptionalText("weather", "Weather: updating...");
+      geocodeUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(location) + "&count=1&language=en&format=json";
+
+      requestJson(geocodeUrl, function (geoData) {
+        var place;
+        var forecastUrl;
+
+        if (!geoData || !geoData.results || geoData.results.length < 1) {
+          showWeatherError();
+          return;
+        }
+
+        place = geoData.results[0];
+        forecastUrl = "https://api.open-meteo.com/v1/forecast?latitude=" + place.latitude + "&longitude=" + place.longitude + "&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m&temperature_unit=celsius&wind_speed_unit=kmh&timezone=auto";
+
+        requestJson(forecastUrl, function (weatherData) {
+          var current;
+          var temp;
+          var humidity;
+          var wind;
+          var code;
+          var text;
+
+          WEATHER_LOADING = false;
+
+          if (!weatherData || !weatherData.current) {
+            showWeatherError();
+            return;
+          }
+
+          current = weatherData.current;
+          temp = Math.round(current.temperature_2m);
+          humidity = Math.round(current.relative_humidity_2m);
+          wind = Math.round(current.wind_speed_10m);
+          code = current.weather_code;
+          text = formatPlace(place) + ": " + temp + "C, " + weatherDescription(code) + ", " + humidity + "% RH, wind " + wind + " km/h";
+          setWeatherCache(text);
+        }, showWeatherError);
+      }, showWeatherError);
     }
 
     function pad(number) {
@@ -424,12 +594,16 @@
       document.getElementById("date").innerHTML = dateText;
       document.getElementById("lunar").innerHTML = getLunarDateText(now);
       setOptionalText("message", CUSTOM_MESSAGE);
-      setOptionalText("weather", WEATHER_TEXT);
+      if (!WEATHER_LOCATION || trimText(WEATHER_LOCATION).length === 0) {
+        setOptionalText("weather", WEATHER_TEXT);
+      }
     }
 
     loadSettings();
     updateClock();
+    updateWeather(false);
     setInterval(updateClock, 30000);
+    setInterval(function () { updateWeather(false); }, WEATHER_REFRESH_MS);
   </script>
 </body>
 </html>
