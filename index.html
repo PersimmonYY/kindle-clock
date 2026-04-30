@@ -197,6 +197,7 @@
     var WEATHER_LOCATION = "";
     var WEATHER_CACHE_TEXT = "";
     var WEATHER_CACHE_TIME = 0;
+    var WEATHER_CACHE_QUERY = "";
     var WEATHER_LOADING = false;
     var WEATHER_REFRESH_MS = 1800000;
     var storageWorks = true;
@@ -278,6 +279,7 @@
       WEATHER_TEXT = loadValue("kindleClockWeather", WEATHER_TEXT);
       WEATHER_LOCATION = loadValue("kindleClockWeatherLocation", WEATHER_LOCATION);
       WEATHER_CACHE_TEXT = loadValue("kindleClockWeatherCacheText", WEATHER_CACHE_TEXT);
+      WEATHER_CACHE_QUERY = loadValue("kindleClockWeatherCacheQuery", WEATHER_CACHE_QUERY);
       WEATHER_CACHE_TIME = parseInt(loadValue("kindleClockWeatherCacheTime", "0"), 10);
       if (isNaN(WEATHER_CACHE_TIME)) {
         WEATHER_CACHE_TIME = 0;
@@ -301,11 +303,13 @@
       WEATHER_LOCATION = document.getElementById("weatherLocationInput").value;
       WEATHER_CACHE_TEXT = "";
       WEATHER_CACHE_TIME = 0;
+      WEATHER_CACHE_QUERY = "";
       saveValue("kindleClockMessage", CUSTOM_MESSAGE);
       saveValue("kindleClockWeather", WEATHER_TEXT);
       saveValue("kindleClockWeatherLocation", WEATHER_LOCATION);
       saveValue("kindleClockWeatherCacheText", WEATHER_CACHE_TEXT);
       saveValue("kindleClockWeatherCacheTime", "" + WEATHER_CACHE_TIME);
+      saveValue("kindleClockWeatherCacheQuery", WEATHER_CACHE_QUERY);
       hideSettings();
       updateClock();
       updateWeather(true);
@@ -317,6 +321,7 @@
       WEATHER_LOCATION = "";
       WEATHER_CACHE_TEXT = "";
       WEATHER_CACHE_TIME = 0;
+      WEATHER_CACHE_QUERY = "";
       document.getElementById("messageInput").value = "";
       document.getElementById("weatherInput").value = "";
       document.getElementById("weatherLocationInput").value = "";
@@ -325,12 +330,23 @@
       saveValue("kindleClockWeatherLocation", "");
       saveValue("kindleClockWeatherCacheText", "");
       saveValue("kindleClockWeatherCacheTime", "0");
+      saveValue("kindleClockWeatherCacheQuery", "");
       hideSettings();
       updateClock();
     }
 
     function trimText(text) {
       return String(text).replace(/^\s+/, "").replace(/\s+$/, "");
+    }
+
+    function normalizeWeatherLocation(location) {
+      var text = trimText(location).toLowerCase();
+
+      if (text === "lyngby" || text === "lyngby denmark" || text === "lyngby, denmark" || text === "2800 lyngby") {
+        return "Kongens Lyngby";
+      }
+
+      return trimText(location);
     }
 
     function requestJson(url, successCallback, errorCallback) {
@@ -384,11 +400,13 @@
       return WEATHER_LOCATION;
     }
 
-    function setWeatherCache(text) {
+    function setWeatherCache(text, query) {
       WEATHER_CACHE_TEXT = text;
       WEATHER_CACHE_TIME = new Date().getTime();
+      WEATHER_CACHE_QUERY = query;
       saveValue("kindleClockWeatherCacheText", WEATHER_CACHE_TEXT);
       saveValue("kindleClockWeatherCacheTime", "" + WEATHER_CACHE_TIME);
+      saveValue("kindleClockWeatherCacheQuery", WEATHER_CACHE_QUERY);
       setOptionalText("weather", WEATHER_CACHE_TEXT);
     }
 
@@ -406,6 +424,7 @@
 
     function updateWeather(force) {
       var location = trimText(WEATHER_LOCATION);
+      var queryLocation;
       var nowTime = new Date().getTime();
       var geocodeUrl;
 
@@ -414,7 +433,9 @@
         return;
       }
 
-      if (!force && WEATHER_CACHE_TEXT && WEATHER_CACHE_TIME > 0 && (nowTime - WEATHER_CACHE_TIME) < WEATHER_REFRESH_MS) {
+      queryLocation = normalizeWeatherLocation(location);
+
+      if (!force && WEATHER_CACHE_TEXT && WEATHER_CACHE_TIME > 0 && WEATHER_CACHE_QUERY === queryLocation && (nowTime - WEATHER_CACHE_TIME) < WEATHER_REFRESH_MS) {
         setOptionalText("weather", WEATHER_CACHE_TEXT);
         return;
       }
@@ -425,7 +446,7 @@
 
       WEATHER_LOADING = true;
       setOptionalText("weather", "Weather: updating...");
-      geocodeUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(location) + "&count=1&language=en&format=json";
+      geocodeUrl = "https://geocoding-api.open-meteo.com/v1/search?name=" + encodeURIComponent(queryLocation) + "&count=1&language=en&format=json";
 
       requestJson(geocodeUrl, function (geoData) {
         var place;
@@ -460,7 +481,7 @@
           wind = Math.round(current.wind_speed_10m);
           code = current.weather_code;
           text = shortPlaceName(place) + "\n" + temp + "\u00b0C, " + weatherDescription(code) + "\nRH " + humidity + "%, wind " + wind + " km/h";
-          setWeatherCache(text);
+          setWeatherCache(text, queryLocation);
         }, showWeatherError);
       }, showWeatherError);
     }
