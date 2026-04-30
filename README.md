@@ -13,7 +13,11 @@ var MANUAL_UTC_OFFSET_HOURS = 2;
 
 Use `MANUAL_UTC_OFFSET_HOURS = 2` for Denmark summer time, UTC+2.
 
-The page also shows a Chinese lunar date. To add your own text or a manually entered weather note, edit:
+The page also shows a Chinese lunar date.
+
+Use the `Settings` link on the page to save a note and a manually entered weather line in the Kindle browser. The saved text is stored locally in the browser.
+
+You can also set default text in `index.html`:
 
 ```javascript
 var CUSTOM_MESSAGE = "Your message here";
